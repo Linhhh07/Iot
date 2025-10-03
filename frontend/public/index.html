@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard</title>
+  <link rel="stylesheet" href="css/base.css">   <!-- layout chung -->
+  <link rel="stylesheet" href="css/index.css">  <!-- style riêng dashboard -->
+</head>
+<body>
+  <div class="container">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="profile">
+        <!-- Avatar nhỏ -->
+        <img src="/avatar.png" alt="Avatar nhỏ">
+        <span>Linh</span>
+      </div>
+
+      <nav>
+        <a href="index.html" class="active"><i>🏠</i> Home</a>
+        <a href="data.html"><i>📊</i> Data</a>
+        <a href="history.html"><i>🕒</i> History</a>
+        <a href="profile.html"><i>👤</i> Profile</a>
+      </nav>
+    </aside>
+
+    <!-- Main -->
+    <main>
+      <!-- Header -->
+      <header class="topbar">
+        <div class="icons">
+          <span>🔔</span>
+          <div class="user"><span>Nguyễn Chi Linh ⌄</span></div>
+        </div>
+      </header>
+
+      <!-- Content -->
+      <section class="content">
+        <h1>Dashboard</h1>
+
+        <!-- Cards -->
+        <div class="cards">
+          <div class="card temp">🔥 Temperature <b id="card-temp">--</b></div>
+          <div class="card hum">💧 Humidity <b id="card-hum">--</b></div>
+          <div class="card light">🌸 Light <b id="card-light">--</b></div>
+        </div>
+
+        <div class="chart-wrapper">
+          <!-- Chart -->
+          <div class="chart-box">
+            <canvas id="myChart"></canvas>
+          </div>
+
+          <!-- Toggles -->
+          <div class="toggle-box">
+      <!-- Fan -->
+  <div class="control green">
+    <span class="icon-wrap">
+      <span class="icon" id="icon-fan">🌀</span>
+      <b>Fan</b>
+    </span>
+    <label class="switch">
+      <input id="s-fan" type="checkbox" onclick="toggleDevice('fan', this)">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <!-- Light -->
+  <div class="control yellow">
+    <span class="icon-wrap">
+      <span class="icon" id="icon-light">💡</span>
+      <b>Light</b>
+    </span>
+    <label class="switch">
+      <input id="s-light" type="checkbox" onclick="toggleDevice('light', this)">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <!-- Air -->
+  <div class="control blue">
+    <span class="icon-wrap">
+      <span class="icon" id="icon-air">❄️</span>
+      <b>Air</b>
+    </span>
+    <label class="switch">
+      <input id="s-air" type="checkbox" onclick="toggleDevice('air', this)">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js/dist/chart.umd.js"></script>
+  <script src="http://localhost:3000/socket.io/socket.io.js"></script>
+  <script>
+    const API_BASE = "http://localhost:3000/api"; 
+    const socket = io("http://localhost:3000");
+
+    // Chart setup
+    const ctx = document.getElementById('myChart').getContext('2d');
+    const myChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          { label: 'Temperature (°C)', data: [], borderColor: 'red', fill:false, tension:0.3 },
+          { label: 'Humidity (%)', data: [], borderColor: 'blue', fill:false, tension:0.3 },
+          { label: 'Light', data: [], borderColor: 'orange', fill:false, tension:0.3 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'top' }},
+        scales: { x: { title:{display:true,text:'Time'}}, y: { beginAtZero:true } }
+      }
+    });
+
+    // Cập nhật card + chart
+    function pushData(temperature, humidity, light) {
+      const t = new Date().toLocaleTimeString();
+      myChart.data.labels.push(t);
+      myChart.data.datasets[0].data.push(temperature);
+      myChart.data.datasets[1].data.push(humidity);
+      myChart.data.datasets[2].data.push(light);
+
+      if (myChart.data.labels.length > 7) {
+        myChart.data.labels.shift();
+        myChart.data.datasets.forEach(ds => ds.data.shift());
+      }
+      myChart.update();
+
+      document.getElementById('card-temp').innerText = temperature + '°C';
+      document.getElementById('card-hum').innerText = humidity + '%';
+      document.getElementById('card-light').innerText = light;
+    }
+
+    // ✅ Toggle chỉ đổi khi ESP trả lời
+    async function toggleDevice(id, checkboxEl) {
+      // Giữ nguyên trạng thái cũ, không cho đổi ngay khi click
+      checkboxEl.checked = !checkboxEl.checked;
+
+      // Disable switch khi chờ phản hồi
+      checkboxEl.disabled = true;
+
+      try {
+        await fetch(`${API_BASE}/devices/${id}/toggle`, { method: "POST" });
+        // ❌ Không đổi trạng thái ở đây
+        // ✅ Chỉ chờ socket.on('device_status')
+      } catch (err) {
+        console.error("Toggle error:", err);
+        // Nếu lỗi thì mở khóa để user bấm lại
+        checkboxEl.disabled = false;
+      }
+    }
+
+     // ✅ socket listener sẽ là nơi duy nhất đổi trạng thái
+  socket.on("device_status", data => {
+    const el = document.getElementById("s-" + data.device);
+    const icon = document.getElementById("icon-" + data.device);
+
+    if (el) {
+      const isOn = (data.state === "ON");
+      el.checked = isOn;
+      el.disabled = false;
+
+      // reset icon
+      if (icon) {
+        icon.classList.remove("fan-on", "light-on", "air-on");
+        if (isOn) {
+          if (data.device === "fan") icon.classList.add("fan-on");
+          if (data.device === "light") icon.classList.add("light-on");
+          if (data.device === "air") icon.classList.add("air-on");
+        }
+      }
+    }
+  });
+
+  // Khi init page, fetch device state và gắn hiệu ứng icon
+  async function refreshDevices() {
+    try {
+      const res = await fetch(`${API_BASE}/devices`);
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        data.forEach(d => {
+          const el = document.getElementById("s-" + d.device_name);
+          const icon = document.getElementById("icon-" + d.device_name);
+          const isOn = (d.state === "ON");
+          if (el) el.checked = isOn;
+          if (icon) {
+            icon.classList.remove("fan-on", "light-on", "air-on");
+            if (isOn) {
+              if (d.device_name === "fan") icon.classList.add("fan-on");
+              if (d.device_name === "light") icon.classList.add("light-on");
+              if (d.device_name === "air") icon.classList.add("air-on");
+            }
+          }
+        });
+      }
+    } catch (err) {
+      console.error("Device fetch error:", err);
+    }
+  }
+
+    
+
+    // 🟢 Socket events từ backend
+    socket.on('new_sensor', data => {
+      pushData(data.temperature, data.humidity, data.light);
+    });
+
+    // Init
+    refreshDevices();
+  </script>
+</body>
+</html>

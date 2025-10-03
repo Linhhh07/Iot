@@ -1,0 +1,63 @@
+
+.content h1 {
+  font-size: 32px;
+  margin-bottom: 20px;
+  color: #333;
+  text-align: center; /* căn giữa chữ */
+}
+
+
+.table-controls {
+  display: flex;
+  align-items: center;        /* căn giữa theo chiều dọc */
+  justify-content: center;    /* căn giữa theo chiều ngang */
+  gap: 10px;                  /* khoảng cách giữa các item */
+  margin-bottom: 15px;
+}
+
+
+
+/* để các button đồng bộ */
+.table-controls button {
+  padding: 7px 12px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  background: #4a90e2;
+  color: white;
+}
+
+.table-controls button:hover {
+  background: #4a90e2;
+}
+
+
+
+.table-controls input,
+
+
+.table-controls input {
+  padding: 7px 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  outline: none;
+}
+
+.table-controls input:focus {
+  border-color: #4a90e2;
+  box-shadow: 0 0 4px rgba(74,144,226,0.4);
+}
+
+#btnSearch {
+  background: #4a90e2;
+  color: #fff;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+#btnSearch:hover {
+  background: #4a90e2;
+}

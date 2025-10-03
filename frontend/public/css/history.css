@@ -1,0 +1,51 @@
+
+.content h1 {
+  font-size: 32px;
+  margin-bottom: 20px;
+  color: #333;
+  text-align: center; /* căn giữa chữ */
+}
+
+
+
+/* Filter box cho history */
+.filter-box {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 15px;
+  align-items: center;
+}
+
+.filter-box input,
+.filter-box select,
+.filter-box button {
+  padding: 7px 10px;
+  font-size: 14px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  outline: none;
+}
+
+.filter-box input:focus,
+.filter-box select:focus {
+  border-color: #4a90e2;
+  box-shadow: 0 0 4px rgba(74,144,226,0.4);
+}
+
+.filter-box button {
+  background: #4a90e2;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.filter-box button:hover {
+  background: #2563eb;
+}
+
+
+.data-table tbody td {
+  font-weight: normal;        /* Bỏ in đậm */
+}

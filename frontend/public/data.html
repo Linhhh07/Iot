@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Data</title>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/data.css">
+
+</head>
+<body>
+<div class="container">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="profile">
+      <img src="/avatar.png" alt="Avatar nhỏ">
+      <span>Linh</span>
+    </div>
+    <nav>
+      <a href="index.html"><i>🏠</i> Home</a>
+      <a href="data.html" class="active"><i>📊</i> Data</a>
+      <a href="history.html"><i>🕒</i> History</a>
+      <a href="profile.html"><i>👤</i> Profile</a>
+    </nav>
+  </aside>
+
+  <!-- Main -->
+  <main>
+    <header class="topbar">
+      <div class="icons">
+        <span>🔔</span>
+        <div class="user">
+          <span>Nguyễn Chi Linh ⌄</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="content">
+      <h1>Data Tables</h1>
+
+      <!-- Filter & Search -->
+      <div class="table-controls">
+        <select id="searchField" style="padding:7px 10px; border-radius:6px;">
+          <option value="all">All</option>
+          <option value="temperature">Temperature (°C)</option>
+          <option value="humidity">Humidity (%)</option>
+          <option value="light">Light (lux)</option>
+          <option value="time">Time (YYYY-MM-DD)</option>
+        </select>
+        <input type="text" id="searchValue" placeholder="Enter value..."
+               style="width:150px; padding:7px 10px; border-radius:6px;" disabled>
+        <button id="btnSearch">Search</button>
+        <button id="btnReset" style="margin-left:10px;">Reset</button>
+      </div>
+
+      <!-- Table -->
+      <table class="data-table">
+        <thead>
+        <tr>
+          <th>Id <span class="sort-icon" data-key="id"><span class="asc">▲</span><span class="desc">▼</span></span></th>
+          <th>Temperature (°C) <span class="sort-icon" data-key="temperature"><span class="asc">▲</span><span class="desc">▼</span></span></th>
+          <th>Light (lux) <span class="sort-icon" data-key="light"><span class="asc">▲</span><span class="desc">▼</span></span></th>
+          <th>Humidity (%) <span class="sort-icon" data-key="humidity"><span class="asc">▲</span><span class="desc">▼</span></span></th>
+          <th>Time <span class="sort-icon" data-key="created_at"><span class="asc">▲</span><span class="desc">▼</span></span></th>
+        </tr>
+        </thead>
+        <tbody id="dataBody">
+        <!-- Data load by JS -->
+        </tbody>
+      </table>
+
+      <!-- Pagination -->
+      <div class="pagination" id="pagination"></div>
+    </section>
+  </main>
+</div>
+
+<script>
+  const tbody = document.getElementById("dataBody");
+  const pagination = document.getElementById("pagination");
+  const searchField = document.getElementById("searchField");
+  const searchValue = document.getElementById("searchValue");
+  const btnSearch = document.getElementById("btnSearch");
+  const btnReset = document.getElementById("btnReset");
+
+  let currentPage = 1;
+  let sortKey = "created_at";
+  let sortOrder = "desc";
+  let currentQuery = "";
+  let currentTime = "";
+
+  // ============ Hiển thị No Data ============
+  function showNoData() {
+    tbody.innerHTML = "<tr><td colspan='5' style='text-align:center; padding:12px; color:#666;'>No data found</td></tr>";
+    pagination.innerHTML = "";
+  }
+
+  // ============ Render Table ============
+  function renderTable(data) {
+    tbody.innerHTML = "";
+    data.forEach(row => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${row.id}</td>
+        <td>${row.temperature ?? "-"}</td>
+        <td>${row.light ?? "-"}</td>
+        <td>${row.humidity ?? "-"}</td>
+        <td class="time-cell" style="cursor:pointer;" title="Click to copy">${row.created_at}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    document.querySelectorAll(".time-cell").forEach(cell => {
+      cell.onclick = () => {
+        navigator.clipboard.writeText(cell.textContent)
+          .then(() => showToast("Copied!"))
+          .catch(err => console.error(err));
+      };
+    });
+  }
+
+  // ============ Toast ============
+  function showToast(message) {
+    let toast = document.createElement("div");
+    toast.className = "toast";
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    setTimeout(() => toast.classList.add("show"), 10);
+    setTimeout(() => {
+      toast.classList.remove("show");
+      setTimeout(() => toast.remove(), 300);
+    }, 2000);
+  }
+
+  // ============ Render Pagination ============
+  function renderPagination(total, limit, page) {
+    pagination.innerHTML = "";
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+
+    const prevBtn = document.createElement("button");
+    prevBtn.textContent = "Previous";
+    prevBtn.disabled = page === 1;
+    prevBtn.onclick = () => loadData(page - 1);
+    pagination.appendChild(prevBtn);
+
+    const maxPagesToShow = 7;
+    let startPage = Math.max(1, page - Math.floor(maxPagesToShow / 2));
+    let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+
+    if (endPage - startPage < maxPagesToShow - 1) {
+      startPage = Math.max(1, endPage - maxPagesToShow + 1);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      const btn = document.createElement("button");
+      btn.textContent = i;
+      if (i === page) btn.classList.add("active");
+      btn.onclick = () => loadData(i);
+      pagination.appendChild(btn);
+    }
+
+    const nextBtn = document.createElement("button");
+    nextBtn.textContent = "Next";
+    nextBtn.disabled = page === totalPages;
+    nextBtn.onclick = () => loadData(page + 1);
+    pagination.appendChild(nextBtn);
+
+    const infoSpan = document.createElement("span");
+    infoSpan.textContent = `Page ${page} of ${totalPages}`;
+    pagination.appendChild(infoSpan);
+  }
+
+  // ============ Load Data từ backend ============
+  async function loadData(page = 1) {
+    try {
+      let url = `http://localhost:3000/api/sensors/search?page=${page}&limit=10&sortKey=${sortKey}&sortOrder=${sortOrder}`;
+      if (currentQuery) url += `&query=${encodeURIComponent(currentQuery)}`;
+      if (currentTime) url += `&time=${encodeURIComponent(currentTime)}`;
+
+      const res = await fetch(url);
+      const json = await res.json();
+
+      if (!json || !Array.isArray(json.data) || json.data.length === 0) {
+        showNoData();
+        return;
+      }
+
+      renderTable(json.data);
+      renderPagination(json.total, json.limit, json.page);
+      currentPage = json.page;
+    } catch (err) {
+      console.error("Fetch error:", err);
+      showNoData();
+    }
+  }
+
+  // ============ Search ============
+  btnSearch.onclick = () => {
+    const field = searchField.value;
+    const value = searchValue.value.trim();
+
+    currentQuery = "";
+    currentTime = "";
+
+    if (field === "time") currentTime = value;
+    else if (field !== "all" && value) currentQuery = `${field}=${value}`;
+
+    loadData(1);
+  };
+
+  searchValue.addEventListener("keypress", e => {
+    if (e.key === "Enter") btnSearch.click();
+  });
+
+  searchField.addEventListener("change", () => {
+    if (searchField.value === "all") {
+      searchValue.value = "";
+      searchValue.disabled = true;
+    } else {
+      searchValue.disabled = false;
+    }
+  });
+
+  // ============ Reset ============
+  btnReset.onclick = () => {
+    searchField.value = "all";
+    searchValue.value = "";
+    searchValue.disabled = true;
+    currentQuery = "";
+    currentTime = "";
+    sortKey = "created_at";
+    sortOrder = "desc";
+    loadData(1);
+  };
+
+  // ============ Sort ============
+  document.querySelectorAll(".sort-icon").forEach(icon => {
+    icon.onclick = () => {
+      const key = icon.dataset.key;
+      sortOrder = (sortKey === key && sortOrder === "asc") ? "desc" : "asc";
+      sortKey = key;
+      loadData(1);
+
+      document.querySelectorAll(".sort-icon").forEach(ic => {
+        const asc = ic.querySelector(".asc");
+        const desc = ic.querySelector(".desc");
+
+        if (ic.dataset.key === key) {
+          asc.classList.toggle("active", sortOrder === "asc");
+          desc.classList.toggle("active", sortOrder === "desc");
+        } else {
+          asc.classList.remove("active");
+          desc.classList.remove("active");
+        }
+      });
+    };
+  });
+
+  // ============ Load lần đầu ============
+  loadData();
+</script>
+</body>
+</html>

@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>History Advanced</title>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/history.css"> 
+</head>
+<body>
+<div class="container">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="profile">
+      <img src="/avatar.png" alt="Avatar nhỏ">
+      <span>Linh</span>
+    </div>
+    <nav>
+      <a href="index.html"><i>🏠</i> Home</a>
+      <a href="data.html"><i>📊</i> Data</a>
+      <a href="history.html" class="active"><i>🕒</i> History</a>
+      <a href="profile.html"><i>👤</i> Profile</a>
+    </nav>
+  </aside>
+
+  <!-- Main -->
+  <main>
+    <!-- Topbar không còn ô search -->
+    <header class="topbar">
+      <div class="icons">
+        <span>🔔</span>
+        <div class="user"><span>Nguyễn Chi Linh</span></div>
+      </div>
+    </header>
+
+    <section class="content">
+      <div class="card">
+        <h1>History action</h1>
+
+        <!-- Filter -->
+        <div class="filter-box">
+          <select id="deviceSelect">
+            <option value="">All Devices</option>
+          </select>
+
+          <select id="actionSelect">
+            <option value="">All Actions</option>
+            <option value="ON">ON</option>
+            <option value="OFF">OFF</option>
+          </select>
+
+          <input type="text" id="timeInput" placeholder="YYYY-MM-DD HH:mm[:ss]">
+
+          <button id="btnSearch" onclick="loadHistory(1)">Search</button>
+          <button id="btnReset" style="margin-left:10px;">Reset</button>
+        </div>
+
+        <!-- History Table -->
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Id 
+                <span class="sort-icon" data-key="id">
+                  <span class="asc">▲</span>
+                  <span class="desc">▼</span>
+                </span>
+              </th>
+              <th>Device</th>
+              <th>Action</th>
+              <th>Time 
+                <span class="sort-icon" data-key="created_at">
+                  <span class="asc">▲</span>
+                  <span class="desc">▼</span>
+                </span>
+              </th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+
+        <!-- Pagination -->
+        <div class="pagination" id="pagination"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+const tableBody = document.querySelector('.data-table tbody');
+const paginationDiv = document.getElementById('pagination');
+const deviceSelect = document.getElementById('deviceSelect');
+const actionSelect = document.getElementById('actionSelect');
+const timeInput = document.getElementById('timeInput');
+const btnSearch = document.getElementById('btnSearch');
+const btnReset = document.getElementById('btnReset');
+const limit = 5;
+
+let currentPage = 1;
+let totalPages = 1;
+let sortOrder = { created_at: "desc" }; // default sort (mới nhất trước)
+const refreshInterval = 3000;
+
+// ============ Load devices ============
+async function loadDevices() {
+  try {
+    const res = await fetch('http://localhost:3000/api/devices');
+    const devices = await res.json();
+    devices.forEach(d => {
+      const option = document.createElement('option');
+      option.value = d.device_name;
+      option.textContent = d.device_name;
+      deviceSelect.appendChild(option);
+    });
+  } catch (err) { console.error(err); }
+}
+
+// ============ Toast ============
+function showToast(message) {
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.classList.add('show'), 10);
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 300);
+  }, 2000);
+}
+
+// ============ Load history ============
+async function loadHistory(page = 1) {
+  currentPage = page;
+
+  const device = deviceSelect.value || "All";
+  const action = actionSelect.value || "";
+  const queryParts = []; // không còn searchInput nữa
+  const queryStr = queryParts.length ? `query=${queryParts.join(';')}` : '';
+  const timeParam = timeInput.value ? `&time=${encodeURIComponent(timeInput.value)}` : '';
+
+  const sortKey = Object.keys(sortOrder)[0];
+  const sortDir = sortOrder[sortKey];
+
+  const url = `http://localhost:3000/api/devices/history/${device === "All" ? 'All' : device}?page=${page}&limit=${limit}&${queryStr}${timeParam}&action=${action}&sortKey=${sortKey}&sortOrder=${sortDir}`;
+
+  try {
+    const res = await fetch(url);
+    const json = await res.json();
+    const rows = json.data;
+
+    tableBody.innerHTML = '';
+    if (rows && rows.length > 0) {
+      rows.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${row.id}</td>
+          <td>${row.device_name}</td>
+          <td>${row.state}</td>
+          <td class="time-cell" style="cursor:pointer;" title="Click to copy">${row.created_at}</td>
+        `;
+        tableBody.appendChild(tr);
+      });
+
+      // click copy time
+      document.querySelectorAll(".time-cell").forEach(cell => {
+        cell.onclick = () => {
+          navigator.clipboard.writeText(cell.textContent)
+            .then(() => showToast("Copied!"))
+            .catch(err => console.error(err));
+        };
+      });
+
+    } else {
+      tableBody.innerHTML = `<tr><td colspan="4">No data available</td></tr>`;
+    }
+
+    renderPagination(json.page, json.totalPages);
+  } catch (err) {
+    console.error(err);
+    tableBody.innerHTML = `<tr><td colspan="4">Error loading data</td></tr>`;
+  }
+}
+
+// ============ Render pagination ============
+function renderPagination(currentPage, totalPages) {
+  paginationDiv.innerHTML = "";
+  const prevBtn = document.createElement("button");
+  prevBtn.textContent = "Previous";
+  prevBtn.disabled = currentPage === 1;
+  prevBtn.onclick = () => loadHistory(currentPage - 1);
+  paginationDiv.appendChild(prevBtn);
+
+  const maxPagesToShow = 7;
+  let start = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+  let end = Math.min(totalPages, start + maxPagesToShow - 1);
+  if (end - start < maxPagesToShow - 1) start = Math.max(1, end - maxPagesToShow + 1);
+
+  for (let i = start; i <= end; i++) {
+    const btn = document.createElement("button");
+    btn.textContent = i;
+    if (i === currentPage) btn.classList.add("active");
+    btn.onclick = () => loadHistory(i);
+    paginationDiv.appendChild(btn);
+  }
+
+  const nextBtn = document.createElement("button");
+  nextBtn.textContent = "Next";
+  nextBtn.disabled = currentPage === totalPages;
+  nextBtn.onclick = () => loadHistory(currentPage + 1);
+  paginationDiv.appendChild(nextBtn);
+
+  const infoSpan = document.createElement("span");
+  infoSpan.textContent = `Page ${currentPage} of ${totalPages}`;
+  infoSpan.style.marginLeft = "10px";
+  paginationDiv.appendChild(infoSpan);
+}
+
+// ============ Sort ============
+document.querySelectorAll(".sort-icon").forEach(icon => {
+  icon.onclick = () => {
+    const key = icon.dataset.key;
+    const current = sortOrder[key];
+    sortOrder = {};
+    sortOrder[key] = current === "asc" ? "desc" : "asc";
+    if (!sortOrder[key]) sortOrder[key] = "asc";
+
+    document.querySelectorAll(".sort-icon .asc, .sort-icon .desc").forEach(el => el.classList.remove("active"));
+    const asc = icon.querySelector(".asc");
+    const desc = icon.querySelector(".desc");
+    asc.classList.toggle("active", sortOrder[key] === "asc");
+    desc.classList.toggle("active", sortOrder[key] === "desc");
+
+    loadHistory(1);
+  };
+});
+
+// ============ Search & Reset ============
+btnSearch.onclick = () => loadHistory(1);
+
+btnReset.onclick = () => {
+  deviceSelect.value = "";
+  actionSelect.value = "";
+  timeInput.value = "";
+
+  currentPage = 1;
+  sortOrder = { created_at: "desc" };
+
+  document.querySelectorAll(".sort-icon .asc, .sort-icon .desc").forEach(el => el.classList.remove("active"));
+
+  loadHistory(1);
+};
+
+// ============ Auto refresh ============
+setInterval(() => { loadHistory(currentPage); }, refreshInterval);
+
+// ============ Init ============
+window.onload = async () => {
+  await loadDevices();
+  loadHistory(1);
+};
+</script>
+</body>
+</html>

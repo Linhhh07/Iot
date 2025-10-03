@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Profile</title>
+  <link rel="stylesheet" href="css/base.css">   <!-- dùng chung layout -->
+  <link rel="stylesheet" href="css/profile.css"> <!-- style riêng cho profile -->
+</head>
+<body>
+  <div class="container">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="profile">
+        <!-- Avatar nhỏ -->
+        <img src="/avatar.png" alt="Avatar nhỏ">
+        <span>Linh</span>
+      </div>
+      <nav>
+        <a href="index.html"><i>🏠</i> Home</a>
+        <a href="data.html"><i>📊</i> Data</a>
+        <a href="history.html"><i>🕒</i> History</a>
+        <a href="profile.html" class="active"><i>👤</i> Profile</a>
+      </nav>
+    </aside>
+
+    <!-- Main -->
+    <main>
+      <!-- Topbar -->
+      <header class="topbar">
+        
+        <div class="icons">
+          <span>🔔</span>
+          <div class="user">
+            <span>Nguyễn Chi Linh ⌄</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Content -->
+      <section class="content profile-page">
+        <h1>My Profile</h1>
+        
+        <div class="profile-container">
+          <!-- Avatar lớn (giữ placeholder mặc định) -->
+          <div class="profile-left">
+            <img src="/avatar.png" alt="Avatar" class="avatar-large">
+          </div>
+
+          <!-- Thông tin -->
+          <div class="profile-right">
+            <div class="info-group">
+              <label>Họ và Tên</label>
+              <input type="text" value="Nguyễn Chi Linh" readonly>
+            </div>
+            <div class="info-group">
+              <label>Mã Sinh Viên</label>
+              <input type="text" value="B22DCCN490" readonly>
+            </div>
+
+            <div class="info-extra">
+              <p><b>My email Address</b><br>
+                <a href="mailto:linh2004107@gmail.com">linh2004107@gmail.com</a> 
+                <span class="note">1 month ago</span>
+              </p>
+              <p><b>Link Figma</b><br>
+                <a href="https://www.figma.com/design/dr8hJOU38AYShElRlU0KS/Untitled?node-id=4-699&t=TYhyAfVow23y2jA1-1" target="_blank">
+                  https://www.figma.com/...
+                </a>
+              </p>
+              <p><b>Link Github</b><br>
+                <a href="https://github.com/Linhhh07" target="_blank">https://github.com/Linhhh07</a>
+              </p>
+            </div>
+
+            <button class="btn-edit">Edit</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
