@@ -5,7 +5,6 @@
   <title>Data</title>
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/data.css">
-
 </head>
 <body>
 <div class="container">
@@ -47,9 +46,20 @@
           <option value="time">Time (YYYY-MM-DD)</option>
         </select>
         <input type="text" id="searchValue" placeholder="Enter value..."
-               style="width:150px; padding:7px 10px; border-radius:6px;" disabled>
+               style="width:150px; padding:7px 10px; border-radius:6px;">
         <button id="btnSearch">Search</button>
         <button id="btnReset" style="margin-left:10px;">Reset</button>
+
+        <!-- 👇 Thêm chọn số dòng -->
+        <label style="margin-left:20px;">Show
+          <select id="limitSelect" style="padding:7px 10px; border-radius:6px;">
+            <option value="5">5</option>
+            <option value="10" selected>10</option>
+            <option value="15">15</option>
+            <option value="20">20</option>
+          </select>
+          rows
+        </label>
       </div>
 
       <!-- Table -->
@@ -63,9 +73,7 @@
           <th>Time <span class="sort-icon" data-key="created_at"><span class="asc">▲</span><span class="desc">▼</span></span></th>
         </tr>
         </thead>
-        <tbody id="dataBody">
-        <!-- Data load by JS -->
-        </tbody>
+        <tbody id="dataBody"></tbody>
       </table>
 
       <!-- Pagination -->
@@ -81,12 +89,18 @@
   const searchValue = document.getElementById("searchValue");
   const btnSearch = document.getElementById("btnSearch");
   const btnReset = document.getElementById("btnReset");
+  const limitSelect = document.getElementById("limitSelect");
 
   let currentPage = 1;
   let sortKey = "created_at";
   let sortOrder = "desc";
   let currentQuery = "";
   let currentTime = "";
+  let currentTemperature = "";
+  let currentHumidity = "";
+  let currentLight = "";
+
+  let limit = 10; // mặc định 10 dòng / trang
 
   // ============ Hiển thị No Data ============
   function showNoData() {
@@ -173,9 +187,12 @@
   // ============ Load Data từ backend ============
   async function loadData(page = 1) {
     try {
-      let url = `http://localhost:3000/api/sensors/search?page=${page}&limit=10&sortKey=${sortKey}&sortOrder=${sortOrder}`;
-      if (currentQuery) url += `&query=${encodeURIComponent(currentQuery)}`;
+      let url = `http://localhost:3000/api/sensors/search?page=${page}&limit=${limit}&sortKey=${sortKey}&sortOrder=${sortOrder}`;
+      if (currentQuery) url += `&search=${encodeURIComponent(currentQuery)}`;
       if (currentTime) url += `&time=${encodeURIComponent(currentTime)}`;
+      if (currentTemperature) url += `&temperature=${encodeURIComponent(currentTemperature)}`;
+      if (currentHumidity) url += `&humidity=${encodeURIComponent(currentHumidity)}`;
+      if (currentLight) url += `&light=${encodeURIComponent(currentLight)}`;
 
       const res = await fetch(url);
       const json = await res.json();
@@ -195,43 +212,52 @@
   }
 
   // ============ Search ============
-  btnSearch.onclick = () => {
-    const field = searchField.value;
-    const value = searchValue.value.trim();
+// 1️⃣ Cho phép search "All"
+btnSearch.onclick = () => {
+  const field = searchField.value;
+  const value = searchValue.value.trim();
 
-    currentQuery = "";
-    currentTime = "";
+  // Reset tất cả trước khi search
+  currentQuery = "";
+  currentTime = "";
+  currentTemperature = "";
+  currentHumidity = "";
+  currentLight = "";
 
-    if (field === "time") currentTime = value;
-    else if (field !== "all" && value) currentQuery = `${field}=${value}`;
+  if (field === "time") {
+    currentTime = value;
+  } else if (field === "all" && value) {
+    currentQuery = value;
+  } else if (field === "temperature") {
+    currentTemperature = value;
+  } else if (field === "humidity") {
+    currentHumidity = value;
+  } else if (field === "light") {
+    currentLight = value;
+  }
 
-    loadData(1);
-  };
+  loadData(1);
+};
 
-  searchValue.addEventListener("keypress", e => {
-    if (e.key === "Enter") btnSearch.click();
-  });
+// 2️⃣ Reset không disable input
+btnReset.onclick = () => {
+  searchField.value = "all";
+  searchValue.value = "";
+  searchValue.disabled = false;
+  currentQuery = "";
+  currentTime = "";
+  sortKey = "created_at";
+  sortOrder = "desc";
+  loadData(1);
+};
 
-  searchField.addEventListener("change", () => {
-    if (searchField.value === "all") {
-      searchValue.value = "";
-      searchValue.disabled = true;
-    } else {
-      searchValue.disabled = false;
-    }
-  });
 
-  // ============ Reset ============
-  btnReset.onclick = () => {
-    searchField.value = "all";
-    searchValue.value = "";
-    searchValue.disabled = true;
-    currentQuery = "";
-    currentTime = "";
-    sortKey = "created_at";
-    sortOrder = "desc";
-    loadData(1);
-  };
+searchField.addEventListener("change", () => {
+  searchValue.disabled = false; // luôn cho nhập
+});
+
+
+
 
   // ============ Sort ============
   document.querySelectorAll(".sort-icon").forEach(icon => {
@@ -254,6 +280,12 @@
         }
       });
     };
+  });
+
+  // ============ Chọn số dòng mỗi trang ============
+  limitSelect.addEventListener("change", () => {
+    limit = parseInt(limitSelect.value);
+    loadData(1);
   });
 
   // ============ Load lần đầu ============

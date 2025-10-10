@@ -24,7 +24,6 @@
 
   <!-- Main -->
   <main>
-    <!-- Topbar không còn ô search -->
     <header class="topbar">
       <div class="icons">
         <span>🔔</span>
@@ -37,48 +36,63 @@
         <h1>History action</h1>
 
         <!-- Filter -->
-        <div class="filter-box">
-          <select id="deviceSelect">
-            <option value="">All Devices</option>
-          </select>
+        <!-- Filter (thêm Show rows ở đây) -->
+<div class="filter-box">
+  <select id="deviceSelect">
+    <option value="">All Devices</option>
+  </select>
 
-          <select id="actionSelect">
-            <option value="">All Actions</option>
-            <option value="ON">ON</option>
-            <option value="OFF">OFF</option>
-          </select>
+  <select id="actionSelect">
+    <option value="">All Actions</option>
+    <option value="ON">ON</option>
+    <option value="OFF">OFF</option>
+  </select>
 
-          <input type="text" id="timeInput" placeholder="YYYY-MM-DD HH:mm[:ss]">
+  <input type="text" id="timeInput" placeholder="YYYY-MM-DD HH:mm[:ss]">
 
-          <button id="btnSearch" onclick="loadHistory(1)">Search</button>
-          <button id="btnReset" style="margin-left:10px;">Reset</button>
-        </div>
+  <button id="btnSearch" onclick="loadHistory(1)">Search</button>
+  <button id="btnReset" style="margin-left:10px;">Reset</button>
 
-        <!-- History Table -->
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Id 
-                <span class="sort-icon" data-key="id">
-                  <span class="asc">▲</span>
-                  <span class="desc">▼</span>
-                </span>
-              </th>
-              <th>Device</th>
-              <th>Action</th>
-              <th>Time 
-                <span class="sort-icon" data-key="created_at">
-                  <span class="asc">▲</span>
-                  <span class="desc">▼</span>
-                </span>
-              </th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+  <!-- 👇 Thêm Show rows ở đây, giống data.html -->
+  <label style="margin-left:20px;">Show
+    <select id="limitSelect" style="padding:7px 10px; border-radius:6px;">
+      <option value="5">5</option>
+      <option value="10" selected>10</option>
+      <option value="15">15</option>
+      <option value="20">20</option>
+    </select>
+    rows
+  </label>
+</div>
 
-        <!-- Pagination -->
-        <div class="pagination" id="pagination"></div>
+<!-- History Table (giữ nguyên) -->
+<table class="data-table">
+  <thead>
+    <tr>
+      <th>Id 
+        <span class="sort-icon" data-key="id">
+          <span class="asc">▲</span>
+          <span class="desc">▼</span>
+        </span>
+      </th>
+      <th>Device</th>
+      <th>Action</th>
+      <th>Time 
+        <span class="sort-icon" data-key="created_at">
+          <span class="asc">▲</span>
+          <span class="desc">▼</span>
+        </span>
+      </th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+
+<div class="pagination" id="pagination"></div>  
+
+       
+
       </div>
     </section>
   </main>
@@ -90,13 +104,13 @@ const paginationDiv = document.getElementById('pagination');
 const deviceSelect = document.getElementById('deviceSelect');
 const actionSelect = document.getElementById('actionSelect');
 const timeInput = document.getElementById('timeInput');
-const btnSearch = document.getElementById('btnSearch');
 const btnReset = document.getElementById('btnReset');
-const limit = 5;
+const limitSelect = document.getElementById('limitSelect');
 
+let limit = parseInt(limitSelect.value);
 let currentPage = 1;
 let totalPages = 1;
-let sortOrder = { created_at: "desc" }; // default sort (mới nhất trước)
+let sortOrder = { created_at: "desc" };
 const refreshInterval = 3000;
 
 // ============ Load devices ============
@@ -132,14 +146,12 @@ async function loadHistory(page = 1) {
 
   const device = deviceSelect.value || "All";
   const action = actionSelect.value || "";
-  const queryParts = []; // không còn searchInput nữa
-  const queryStr = queryParts.length ? `query=${queryParts.join(';')}` : '';
   const timeParam = timeInput.value ? `&time=${encodeURIComponent(timeInput.value)}` : '';
 
   const sortKey = Object.keys(sortOrder)[0];
   const sortDir = sortOrder[sortKey];
 
-  const url = `http://localhost:3000/api/devices/history/${device === "All" ? 'All' : device}?page=${page}&limit=${limit}&${queryStr}${timeParam}&action=${action}&sortKey=${sortKey}&sortOrder=${sortDir}`;
+  const url = `http://localhost:3000/api/devices/history/${device === "All" ? 'All' : device}?page=${page}&limit=${limit}&action=${action}&sortKey=${sortKey}&sortOrder=${sortDir}${timeParam}`;
 
   try {
     const res = await fetch(url);
@@ -159,7 +171,6 @@ async function loadHistory(page = 1) {
         tableBody.appendChild(tr);
       });
 
-      // click copy time
       document.querySelectorAll(".time-cell").forEach(cell => {
         cell.onclick = () => {
           navigator.clipboard.writeText(cell.textContent)
@@ -167,7 +178,6 @@ async function loadHistory(page = 1) {
             .catch(err => console.error(err));
         };
       });
-
     } else {
       tableBody.innerHTML = `<tr><td colspan="4">No data available</td></tr>`;
     }
@@ -233,20 +243,23 @@ document.querySelectorAll(".sort-icon").forEach(icon => {
 });
 
 // ============ Search & Reset ============
-btnSearch.onclick = () => loadHistory(1);
-
 btnReset.onclick = () => {
   deviceSelect.value = "";
   actionSelect.value = "";
   timeInput.value = "";
-
-  currentPage = 1;
   sortOrder = { created_at: "desc" };
 
   document.querySelectorAll(".sort-icon .asc, .sort-icon .desc").forEach(el => el.classList.remove("active"));
 
+  // ✅ Giữ nguyên limit đã chọn
   loadHistory(1);
 };
+
+// ============ Chọn số dòng mỗi trang ============
+limitSelect.addEventListener("change", () => {
+  limit = parseInt(limitSelect.value);
+  loadHistory(1);
+});
 
 // ============ Auto refresh ============
 setInterval(() => { loadHistory(currentPage); }, refreshInterval);

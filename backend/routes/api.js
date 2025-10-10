@@ -21,32 +21,60 @@ function formatRows(rows) {
 // ===================
 // 🔎 Sensors Search API (multi-field + time + pagination + precise + sort)
 // ===================
+// ===================
+// 🔎 Sensors Search API (rút gọn, bỏ "query=", hỗ trợ search=... hoặc field cụ thể)
+// ===================
 router.get('/sensors/search', async (req, res) => {
   try {
-    const { page = 1, limit = 10, query, time, sortKey = "created_at", sortOrder = "desc" } = req.query;
-    const offset = (parseInt(page) - 1) * parseInt(limit);
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      temperature,
+      humidity,
+      light,
+      time,
+      sortKey = "created_at",
+      sortOrder = "desc"
+    } = req.query;
 
+    const offset = (parseInt(page) - 1) * parseInt(limit);
     let where = "1=1";
     const params = [];
 
-    // --- Multi-field query ---
-    if (query) {
-      const fields = query.split(";");
-      fields.forEach(f => {
-        const [key, value] = f.split("=");
-        if (value !== undefined && value !== "") {
-          if (["temperature", "light"].includes(key)) {
-            where += ` AND ${key}+0 = ?`;
-            params.push(parseFloat(value));
-          } else if (key === "humidity") {
-            where += " AND humidity = ?";
-            params.push(parseInt(value));
-          }
-        }
-      });
+    // ===== 1Lọc theo field cụ thể =====
+    if (temperature) {
+      where += " AND temperature = ?";
+      params.push(parseFloat(temperature));
+    }
+    if (humidity) {
+      where += " AND humidity = ?";
+      params.push(parseInt(humidity));
+    }
+    if (light) {
+      where += " AND light = ?";
+      params.push(parseFloat(light));
     }
 
-    // --- Time filter ---
+    // ===== 2️ Tìm toàn cục =====
+    if (search && !temperature && !humidity && !light) {
+      const q = search.trim();
+      if (!isNaN(q)) {
+        // Nếu là số → tìm theo tất cả trường số
+        where += ` AND (
+          temperature = ? OR
+          humidity = ? OR
+          light = ?
+        )`;
+        params.push(parseFloat(q), parseInt(q), parseFloat(q));
+      } else {
+        // Nếu là chữ → tìm trong thời gian
+        where += " AND created_at LIKE ?";
+        params.push(`%${q}%`);
+      }
+    }
+
+    // ===== 3 Lọc theo thời gian =====
     if (time) {
       if (/^\d{4}-\d{2}-\d{2}$/.test(time)) {
         where += " AND created_at BETWEEN ? AND ?";
@@ -62,20 +90,20 @@ router.get('/sensors/search', async (req, res) => {
       }
     }
 
-    // --- Count tổng ---
+    // ===== 4 Đếm tổng =====
     const [countRows] = await db.query(
       `SELECT COUNT(*) as total FROM sensor_data WHERE ${where}`,
       params
     );
     const total = countRows[0].total;
-    const totalPages = Math.ceil(total / limit);
+    const totalPages = Math.ceil(total / parseInt(limit));
 
-    // --- Validate sortKey ---
+    // ===== 5 Sort an toàn =====
     const validSortKeys = ["id", "temperature", "humidity", "light", "created_at"];
     const safeSortKey = validSortKeys.includes(sortKey) ? sortKey : "created_at";
     const safeSortOrder = sortOrder.toLowerCase() === "asc" ? "ASC" : "DESC";
 
-    // --- Lấy dữ liệu (có sort) ---
+    // ===== 6 Lấy dữ liệu =====
     const [rows] = await db.query(
       `SELECT id, temperature, humidity, light, created_at
        FROM sensor_data
@@ -100,6 +128,7 @@ router.get('/sensors/search', async (req, res) => {
     res.status(500).json({ error: 'DB error' });
   }
 });
+
 
 
 // ===================
@@ -248,19 +277,32 @@ router.get('/devices/history/:device', async (req, res) => {
       params
     );
     const total = countRows[0].total;
-    const totalPages = Math.ceil(total / limit);
+    const totalPages = Math.ceil(total / parseInt(limit));
 
     // Sort key validate
     const validSortKeys = ["id", "created_at"];
-    const safeSortKey = validSortKeys.includes(sortKey) ? sortKey : "id";
+    const safeSortKey = validSortKeys.includes(sortKey) ? sortKey : "created_at";
     const safeSortOrder = sortOrder.toLowerCase() === "asc" ? "ASC" : "DESC";
 
-    // Data query với fallback thứ tự id để tránh trùng created_at bị đảo
+    // safe escapeId (nếu db.escapeId không tồn tại thì fallback đơn giản)
+    const escapeId = typeof db.escapeId === 'function'
+      ? db.escapeId.bind(db)
+      : (k) => `\`${String(k).replace(/`/g, '')}\``;
+
+    // Nếu sort theo id thì không cần duplicate id; nếu sort theo created_at thì tie-breaker id cùng chiều sort
+    let orderBy = "";
+    if (safeSortKey === "id") {
+      orderBy = `ORDER BY id ${safeSortOrder}`;
+    } else {
+      orderBy = `ORDER BY ${escapeId(safeSortKey)} ${safeSortOrder}, id ${safeSortOrder}`;
+    }
+
+    // Data query
     const [rows] = await db.query(
       `SELECT id, device_name, state, created_at
        FROM device_history
        WHERE ${where}
-       ORDER BY ${db.escapeId(safeSortKey)} ${safeSortOrder}, id ASC
+       ${orderBy}
        LIMIT ? OFFSET ?`,
       [...params, parseInt(limit), offset]
     );
@@ -279,6 +321,7 @@ router.get('/devices/history/:device', async (req, res) => {
     res.status(500).json({ error: 'DB error' });
   }
 });
+
 
 
 

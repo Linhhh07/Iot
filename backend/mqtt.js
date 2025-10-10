@@ -2,7 +2,7 @@
 const mqtt = require('mqtt');
 const db = require('./db');
 
-const MQTT_BROKER = 'mqtt://192.168.1.217:1883';
+const MQTT_BROKER = 'mqtt:// 192.168.1.217:1883';
 
 const mqttClient = mqtt.connect(MQTT_BROKER, {
   username: 'user1',
