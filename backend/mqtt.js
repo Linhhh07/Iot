@@ -2,7 +2,7 @@
 const mqtt = require('mqtt');
 const db = require('./db');
 
-const MQTT_BROKER = 'mqtt:// 192.168.1.217:1883';
+const MQTT_BROKER = 'mqtt://172.20.10.4:1883';
 
 const mqttClient = mqtt.connect(MQTT_BROKER, {
   username: 'user1',
@@ -16,21 +16,21 @@ function setIO(ioInstance) {
 }
 
 mqttClient.on('connect', () => {
-  console.log('✅ MQTT connected');
+  console.log('MQTT connected');
 
   mqttClient.subscribe("esp/sensor", (err) => {
-    if (err) console.error("❌ Subscribe error esp/sensor:", err);
-    else console.log("📡 Subscribed to esp/sensor");
+    if (err) console.error("Subscribe error esp/sensor:", err);
+    else console.log("Subscribed to esp/sensor");
   });
 
   mqttClient.subscribe("esp/status/#", (err) => {
-    if (err) console.error("❌ Subscribe error esp/status/#:", err);
-    else console.log("📡 Subscribed to esp/status/#");
+    if (err) console.error("Subscribe error esp/status/#:", err);
+    else console.log("Subscribed to esp/status/#");
   });
 
   mqttClient.subscribe("esp/hello", (err) => {
-    if (err) console.error("❌ Subscribe error esp/hello:", err);
-    else console.log("📡 Subscribed to esp/hello");
+    if (err) console.error("Subscribe error esp/hello:", err);
+    else console.log("Subscribed to esp/hello");
   });
 });
 
@@ -42,8 +42,10 @@ mqttClient.on('message', async (topic, message) => {
     // sensor
     if (topic === "esp/sensor") {
       let data;
-      try { data = JSON.parse(raw); } catch (e) {
-        console.error("❌ Sensor JSON parse error:", e.message);
+      try {
+        data = JSON.parse(raw);
+      } catch (e) {
+        console.error("Sensor JSON parse error:", e.message);
         return;
       }
 
@@ -52,7 +54,7 @@ mqttClient.on('message', async (topic, message) => {
           "INSERT INTO sensor_data (temperature, humidity, light) VALUES (?, ?, ?)",
           [data.temp, data.hum, data.cdsAnalog]
         );
-        console.log("🌡️ Sensor saved:", data);
+        console.log("Sensor data saved:", data);
 
         if (io) {
           io.emit("new_sensor", {
@@ -63,7 +65,7 @@ mqttClient.on('message', async (topic, message) => {
           });
         }
       } else {
-        console.warn("⚠️ Incomplete sensor data:", data);
+        console.warn("Incomplete sensor data:", data);
       }
     }
 
@@ -71,7 +73,7 @@ mqttClient.on('message', async (topic, message) => {
     else if (topic.startsWith("esp/status/")) {
       const device = topic.split("/")[2];
       const state = raw.trim().toUpperCase(); // ON/OFF
-      console.log(`📥 Status update: ${device} = ${state}`);
+      console.log(`Status update: ${device} = ${state}`);
 
       await db.query(
         "INSERT INTO device_history (device_name, state) VALUES (?, ?)",
@@ -89,7 +91,7 @@ mqttClient.on('message', async (topic, message) => {
 
     // ESP greeting => restore last known states (from history)
     else if (topic === "esp/hello") {
-      console.log("📡 ESP connected, syncing last state...");
+      console.log("ESP connected, syncing last state...");
 
       const [rows] = await db.query(`
         SELECT t1.device_name, t1.state
@@ -103,11 +105,11 @@ mqttClient.on('message', async (topic, message) => {
 
       rows.forEach(r => {
         mqttClient.publish(`esp/control/${r.device_name}`, r.state, { qos: 1 });
-        console.log(`➡️ Restore ${r.device_name} = ${r.state}`);
+        console.log(`Restored ${r.device_name} = ${r.state}`);
       });
     }
   } catch (err) {
-    console.error("❌ MQTT message error:", err);
+    console.error("MQTT message error:", err);
   }
 });
 

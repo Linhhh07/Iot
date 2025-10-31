@@ -1,7 +1,7 @@
 const mqtt = require('mqtt');
 const db = require('./db');
 
-const MQTT_BROKER = 'mqtt://192.168.1.217:1883';
+const MQTT_BROKER = 'mqtt://172.20.10.4:1883';
 
 const mqttClient = mqtt.connect(MQTT_BROKER, {
   username: 'user1',
@@ -15,24 +15,24 @@ function setIO(ioInstance) {
 }
 
 mqttClient.on('connect', () => {
-  console.log('✅ MQTT connected');
+  console.log('MQTT connected');
 
   // subscribe cảm biến
   mqttClient.subscribe("esp/sensor", (err) => {
-    if (err) console.error("❌ Subscribe error:", err);
-    else console.log("📡 Subscribed to esp/sensor");
+    if (err) console.error("Subscribe error:", err);
+    else console.log("Subscribed to esp/sensor");
   });
 
   // subscribe trạng thái thiết bị
   mqttClient.subscribe("esp/status/#", (err) => {
-    if (err) console.error("❌ Subscribe error:", err);
-    else console.log("📡 Subscribed to esp/status/#");
+    if (err) console.error("Subscribe error:", err);
+    else console.log("Subscribed to esp/status/#");
   });
 
-  // 👉 thêm hello để sync lại trạng thái khi ESP bật lên
+  // subscribe hello để sync lại trạng thái khi ESP bật lên
   mqttClient.subscribe("esp/hello", (err) => {
-    if (err) console.error("❌ Subscribe error:", err);
-    else console.log("📡 Subscribed to esp/hello");
+    if (err) console.error("Subscribe error:", err);
+    else console.log("Subscribed to esp/hello");
   });
 });
 
@@ -49,7 +49,7 @@ mqttClient.on('message', async (topic, message) => {
       try {
         data = JSON.parse(raw);
       } catch (e) {
-        console.error("❌ Sensor JSON parse error:", e.message);
+        console.error("Sensor JSON parse error:", e.message);
         return;
       }
 
@@ -59,7 +59,7 @@ mqttClient.on('message', async (topic, message) => {
           [data.temp, data.hum, data.cdsAnalog]
         );
 
-        console.log("🌡️ Sensor saved:", data);
+        console.log("Sensor data saved:", data);
 
         if (io) {
           io.emit("new_sensor", {
@@ -70,19 +70,18 @@ mqttClient.on('message', async (topic, message) => {
           });
         }
       } else {
-        console.warn("⚠️ Incomplete sensor data:", data);
+        console.warn("Incomplete sensor data:", data);
       }
     }
 
     // ---------- Trạng thái thiết bị ----------
-        // ---------- Trạng thái thiết bị ----------
     else if (topic.startsWith("esp/status/")) {
       const device = topic.split("/")[2]; // ví dụ: esp/status/light
       const state = raw.trim().toUpperCase(); // ép thành ON / OFF
 
-      console.log(`📥 Status update: ${device} = ${state}`);
+      console.log(`Status update: ${device} = ${state}`);
 
-      // 👉 Lấy trạng thái gần nhất từ DB
+      // Lấy trạng thái gần nhất từ DB
       const [lastRows] = await db.query(
         "SELECT state FROM device_history WHERE device_name = ? ORDER BY created_at DESC LIMIT 1",
         [device]
@@ -96,12 +95,12 @@ mqttClient.on('message', async (topic, message) => {
           "INSERT INTO device_history (device_name, state) VALUES (?, ?)",
           [device, state]
         );
-        console.log(`💾 Saved history: ${device} -> ${state}`);
+        console.log(`Saved history: ${device} -> ${state}`);
       } else {
-        console.log(`⏩ No change, skip insert for ${device}`);
+        console.log(`No change, skip insert for ${device}`);
       }
 
-      // Phát realtime cho frontend (luôn emit để UI update kịp)
+      // Phát realtime cho frontend
       if (io) {
         io.emit("device_status", {
           device,
@@ -111,10 +110,9 @@ mqttClient.on('message', async (topic, message) => {
       }
     }
 
-
     // ---------- ESP báo kết nối lại ----------
     else if (topic === "esp/hello") {
-      console.log("📡 ESP connected, syncing last state...");
+      console.log("ESP connected, syncing last state...");
 
       const [rows] = await db.query(`
         SELECT t1.device_name, t1.state
@@ -128,11 +126,11 @@ mqttClient.on('message', async (topic, message) => {
 
       rows.forEach(r => {
         mqttClient.publish(`esp/control/${r.device_name}`, r.state);
-        console.log(`➡️ Restore ${r.device_name} = ${r.state}`);
+        console.log(`Restored ${r.device_name} = ${r.state}`);
       });
     }
   } catch (err) {
-    console.error("❌ MQTT message error:", err);
+    console.error("MQTT message error:", err);
   }
 });
 

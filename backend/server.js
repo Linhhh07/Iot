@@ -24,7 +24,7 @@ const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
 
 io.on('connection', (socket) => {
-  console.log('⚡ WS client connected:', socket.id);
+  console.log(' WS client connected:', socket.id);
 });
 
 // inject socket.io vào mqtt module (để mqtt.js emit được)
@@ -33,5 +33,5 @@ setIO(io);
 // Start server
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log('🚀 Server running on port', PORT);
+  console.log(' Server running on port', PORT);
 });

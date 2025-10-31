@@ -1,8 +1,7 @@
-//// backend/routes/api.js
 const express = require('express');
 const db = require('../db');
 const moment = require('moment-timezone');
-const { mqttClient } = require('../mqtt'); // dùng destructure
+const { mqttClient } = require('../mqtt');
 
 const router = express.Router();
 
@@ -15,15 +14,7 @@ function formatRows(rows) {
   }));
 }
 
-// ===================
-// 🔎 Sensors Search API (multi-field + time + pagination + precise + sort)
-// ===================
-// ===================
-// 🔎 Sensors Search API (multi-field + time + pagination + precise + sort)
-// ===================
-// ===================
-// 🔎 Sensors Search API (rút gọn, bỏ "query=", hỗ trợ search=... hoặc field cụ thể)
-// ===================
+// Sensors Search API
 router.get('/sensors/search', async (req, res) => {
   try {
     const {
@@ -42,11 +33,13 @@ router.get('/sensors/search', async (req, res) => {
     let where = "1=1";
     const params = [];
 
-    // ===== 1Lọc theo field cụ thể =====
-    if (temperature) {
-      where += " AND temperature = ?";
-      params.push(parseFloat(temperature));
-    }
+  if (temperature) {
+  const temp = parseFloat(temperature);
+  where += " AND ABS(temperature - ?) < 0.05";
+  params.push(temp);
+}
+
+
     if (humidity) {
       where += " AND humidity = ?";
       params.push(parseInt(humidity));
@@ -56,25 +49,20 @@ router.get('/sensors/search', async (req, res) => {
       params.push(parseFloat(light));
     }
 
-    // ===== 2️ Tìm toàn cục =====
     if (search && !temperature && !humidity && !light) {
-      const q = search.trim();
-      if (!isNaN(q)) {
-        // Nếu là số → tìm theo tất cả trường số
-        where += ` AND (
-          temperature = ? OR
-          humidity = ? OR
-          light = ?
-        )`;
-        params.push(parseFloat(q), parseInt(q), parseFloat(q));
-      } else {
-        // Nếu là chữ → tìm trong thời gian
-        where += " AND created_at LIKE ?";
-        params.push(`%${q}%`);
-      }
-    }
+  const q = search.trim();
+  if (!isNaN(q)) {
+    const num = parseFloat(q);
+    // tìm gần đúng ±0.05 cho float
+    where += ` AND (ABS(temperature - ?) < 0.05 OR ABS(light - ?) < 0.05 OR humidity = ?)`;
+    params.push(num, num, parseInt(num));
+  } else {
+    where += " AND created_at LIKE ?";
+    params.push(`%${q}%`);
+  }
+}
 
-    // ===== 3 Lọc theo thời gian =====
+
     if (time) {
       if (/^\d{4}-\d{2}-\d{2}$/.test(time)) {
         where += " AND created_at BETWEEN ? AND ?";
@@ -90,7 +78,6 @@ router.get('/sensors/search', async (req, res) => {
       }
     }
 
-    // ===== 4 Đếm tổng =====
     const [countRows] = await db.query(
       `SELECT COUNT(*) as total FROM sensor_data WHERE ${where}`,
       params
@@ -98,12 +85,10 @@ router.get('/sensors/search', async (req, res) => {
     const total = countRows[0].total;
     const totalPages = Math.ceil(total / parseInt(limit));
 
-    // ===== 5 Sort an toàn =====
     const validSortKeys = ["id", "temperature", "humidity", "light", "created_at"];
     const safeSortKey = validSortKeys.includes(sortKey) ? sortKey : "created_at";
     const safeSortOrder = sortOrder.toLowerCase() === "asc" ? "ASC" : "DESC";
 
-    // ===== 6 Lấy dữ liệu =====
     const [rows] = await db.query(
       `SELECT id, temperature, humidity, light, created_at
        FROM sensor_data
@@ -124,16 +109,12 @@ router.get('/sensors/search', async (req, res) => {
     });
 
   } catch (err) {
-    console.error("❌ /sensors/search error:", err);
+    console.error("/sensors/search error:", err);
     res.status(500).json({ error: 'DB error' });
   }
 });
 
-
-
-// ===================
-// Devices API (latest device state, có filter time nếu cần)
-// ===================
+// Devices API (latest device state)
 router.get('/devices', async (req, res) => {
   try {
     const { time } = req.query;
@@ -141,7 +122,6 @@ router.get('/devices', async (req, res) => {
     let where = "1=1";
     const params = [];
 
-    // ⏰ Filter theo time (giống sensors/search)
     if (time) {
       if (/^\d{4}-\d{2}-\d{2}$/.test(time)) {
         where += " AND t1.created_at BETWEEN ? AND ?";
@@ -170,7 +150,7 @@ router.get('/devices', async (req, res) => {
 
     res.json(formatRows(rows));
   } catch (err) {
-    console.error("❌ /devices error:", err);
+    console.error("/devices error:", err);
     res.status(500).json({ error: 'DB error' });
   }
 });
@@ -178,11 +158,10 @@ router.get('/devices', async (req, res) => {
 // Toggle device: gửi lệnh MQTT
 router.post('/devices/:id/toggle', async (req, res) => {
   const { id } = req.params;
-  let { action } = req.body || {}; // action có thể undefined
+  let { action } = req.body || {};
 
   try {
     if (!action) {
-      // lấy trạng thái gần nhất từ history
       const [rows] = await db.query(
         "SELECT state FROM device_history WHERE device_name = ? ORDER BY created_at DESC LIMIT 1",
         [id]
@@ -194,11 +173,11 @@ router.post('/devices/:id/toggle', async (req, res) => {
     }
 
     mqttClient.publish(`esp/control/${id}`, action, { qos: 1 });
-    console.log(`📤 Sent control -> esp/control/${id} = ${action}`);
+    console.log(`Sent control -> esp/control/${id} = ${action}`);
 
     res.json({ device: id, requested: action, status: "sent" });
   } catch (err) {
-    console.error("❌ toggle error:", err);
+    console.error("toggle error:", err);
     res.status(500).json({ error: 'server error' });
   }
 });
@@ -212,16 +191,12 @@ router.get('/devices/:id/status', async (req, res) => {
     );
     res.json(rows.length ? formatRows(rows)[0] : null);
   } catch (err) {
-    console.error("❌ /devices/:id/status error:", err);
+    console.error("/devices/:id/status error:", err);
     res.status(500).json({ error: 'DB error' });
   }
 });
 
-// Device history
-// Device history (advanced: pagination + multi-field filter + totalPages)
-// Device history (filter action)
-// Device history (advanced: pagination + multi-field filter + totalPages + sort)
-// Device history (advanced: pagination + multi-field filter + totalPages + sort)
+// Device history (pagination + multi-field filter + sort)
 router.get('/devices/history/:device', async (req, res) => {
   try {
     const { device } = req.params;
@@ -231,19 +206,16 @@ router.get('/devices/history/:device', async (req, res) => {
     let where = "1=1";
     const params = [];
 
-    // Filter device
     if (device && device !== "All") {
       where += " AND device_name = ?";
       params.push(device);
     }
 
-    // Filter action
     if (action && action !== "") {
       where += " AND UPPER(state) = ?";
       params.push(action.toUpperCase());
     }
 
-    // Search query
     if (query) {
       const fields = query.split(";");
       fields.forEach(f => {
@@ -257,7 +229,6 @@ router.get('/devices/history/:device', async (req, res) => {
       });
     }
 
-    // Filter time
     if (time) {
       if (/^\d{4}-\d{2}-\d{2}$/.test(time)) {
         where += " AND created_at BETWEEN ? AND ?";
@@ -271,7 +242,6 @@ router.get('/devices/history/:device', async (req, res) => {
       }
     }
 
-    // Count tổng
     const [countRows] = await db.query(
       `SELECT COUNT(*) as total FROM device_history WHERE ${where}`,
       params
@@ -279,17 +249,14 @@ router.get('/devices/history/:device', async (req, res) => {
     const total = countRows[0].total;
     const totalPages = Math.ceil(total / parseInt(limit));
 
-    // Sort key validate
     const validSortKeys = ["id", "created_at"];
     const safeSortKey = validSortKeys.includes(sortKey) ? sortKey : "created_at";
     const safeSortOrder = sortOrder.toLowerCase() === "asc" ? "ASC" : "DESC";
 
-    // safe escapeId (nếu db.escapeId không tồn tại thì fallback đơn giản)
     const escapeId = typeof db.escapeId === 'function'
       ? db.escapeId.bind(db)
       : (k) => `\`${String(k).replace(/`/g, '')}\``;
 
-    // Nếu sort theo id thì không cần duplicate id; nếu sort theo created_at thì tie-breaker id cùng chiều sort
     let orderBy = "";
     if (safeSortKey === "id") {
       orderBy = `ORDER BY id ${safeSortOrder}`;
@@ -297,7 +264,6 @@ router.get('/devices/history/:device', async (req, res) => {
       orderBy = `ORDER BY ${escapeId(safeSortKey)} ${safeSortOrder}, id ${safeSortOrder}`;
     }
 
-    // Data query
     const [rows] = await db.query(
       `SELECT id, device_name, state, created_at
        FROM device_history
@@ -317,12 +283,9 @@ router.get('/devices/history/:device', async (req, res) => {
       data: formatRows(rows)
     });
   } catch (err) {
-    console.error("❌ /devices/history error:", err);
+    console.error("/devices/history error:", err);
     res.status(500).json({ error: 'DB error' });
   }
 });
-
-
-
 
 module.exports = router;
